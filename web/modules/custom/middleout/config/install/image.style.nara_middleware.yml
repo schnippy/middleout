@@ -1,0 +1,14 @@
+langcode: en
+status: true
+dependencies: {  }
+name: nara_middleware
+label: "NARA Middleware Image Style"
+effects:
+  nara_middleware_image_style:
+    uuid: nara_middleware_image_style
+    id: image_scale
+    weight: 1
+    data:
+      width: 750
+      height: null
+      upscale: false
