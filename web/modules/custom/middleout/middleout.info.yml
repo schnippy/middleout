@@ -1,0 +1,6 @@
+name: NARA Middleware
+Description: Takes an API query for NARA and converts it to Dynamo storage
+package: Custom
+type: module
+version: 1.0
+core: 8.x

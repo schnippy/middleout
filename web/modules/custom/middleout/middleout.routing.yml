@@ -1,0 +1,17 @@
+middleout.middlewaresettings_form:
+  path: '/admin/config/middleout/settings'
+  defaults:
+    _form: '\Drupal\middleout\Form\MiddlewareSettingsForm'
+    _title: 'NARA API Middleware Settings'
+  requirements:
+    _permission: 'access administration pages'
+  options:
+    _admin_route: TRUE
+
+middleout.content:
+  path: '/middleout'
+  defaults:
+    _controller: '\Drupal\middleout\Controller\MiddleOut::content'
+    _title: 'Middleout'
+  requirements:
+    _permission: 'access content'

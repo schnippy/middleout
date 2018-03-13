@@ -1,0 +1,19 @@
+{
+  "name": "agencychief/naramiddleout",
+  "description": "NARA Middleware API",
+  "type": "drupal-module",
+  "homepage": "https://github.com/agencychief/nara_middleware",
+  "authors": [
+    {
+      "name": "Chief",
+      "homepage": "https://agencychief.com/",
+      "role": "Developer"
+    }
+  ],
+  "license": "GPL-2.0+",
+  "minimum-stability": "dev",
+  "require": {
+	"aws/aws-sdk-php": "^3.52",
+        "gumlet/php-image-resize": "^1.8"      
+  }
+}
