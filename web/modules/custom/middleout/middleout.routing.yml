@@ -15,3 +15,5 @@ middleout.content:
     _title: 'Middleout'
   requirements:
     _permission: 'access content'
+  options:
+    no_cache: 'TRUE'

@@ -14,12 +14,7 @@ use GuzzleHttp\Exception\RequestException;
 
 class MiddleOut {
   public function __construct() {
-    $this->userid = mt_rand(100000,9999999);
-    $this->objectid = mt_rand(100000,9999999);
-    $this->ip_address = "".mt_rand(0,255).".".mt_rand(0,255).".".mt_rand(0,255).".".mt_rand(0,255);
-    $this->score = mt_rand(0,4);
-    $this->assetid = mt_rand(1000000,9999999);
-
+    $this->config = \Drupal::config('middleout.middlewaresettings');
     $this->dynamo = $this->get_dynamo_connection();
     $this->marshaler = new Marshaler();
   }
@@ -30,7 +25,11 @@ class MiddleOut {
     $sdk = new \Aws\Sdk([
       'endpoint'   => 'http://dynamodb.us-east-2.amazonaws.com',
       'region'   => 'us-east-2',
-      'version'  => 'latest'
+      'version'  => 'latest',
+      'credentials' => [
+        'key'    => $this->config->get('aws_access_key'),
+        'secret' => $this->config->get('aws_secret_key'),
+      ],
     ]);
     $this->dynamo = $sdk->createDynamoDb();
     return $this->dynamo;
@@ -40,15 +39,15 @@ class MiddleOut {
    */
   private function compile_json_result($parent,$title,$objectid,$objecturi) {
     $uuid = substr(str_shuffle(md5(time())),0,24);
+    $base64 = $this->debiggen_image($objecturi);
     $tmp = array(
       "uuid" => $uuid,
       "naid" => $parent,
       "title" => $title,
       "objectid" => $objectid,
       "objecturi" => $objecturi,
-      "objecturi_thumb" => "thumb",
+      "objecturi_thumb" => $base64,
     );
-    $this->debiggen_image($objecturi);
     return json_encode($tmp, JSON_UNESCAPED_SLASHES);
   }
   /**
@@ -57,10 +56,9 @@ class MiddleOut {
   public function content() {
 
     $output = "<h2>Load NARA Query into Dynamo</h2><hr>";
-    $config = \Drupal::config('middleout.middlewaresettings');
-    $base_url = $config->get('base_url');
-    $api_query = "?".$config->get('api_query');
-    $search = $base_url."?".$api_query;
+    $base_url = $this->config->get('base_url');
+    $api_query = "?".$this->config->get('api_query');
+    $search = $base_url.$api_query;
 
     $client = new Client([
       'base_uri' => $base_url,
@@ -70,7 +68,7 @@ class MiddleOut {
     try {
       $response = $client->request('GET', $api_query);
     } catch (RequestException $e) {
-      $output .= "<b>ERROR</b></br>";
+      $output .= "<p><b>ERROR</b>: Problem fetching URL $search;</br></p>";
       $output .= Psr7\str($e->getRequest());
       if ($e->hasResponse()) {
          $output .= Psr7\str($e->getResponse());
@@ -78,16 +76,17 @@ class MiddleOut {
     }
     $output .= "Processing this URL query: <a href='$search'>$api_query</a><br />";
 
-    if ($response) {
+
+    // initialize array of results to send to dynamo
+    $dynamo = array();
+
+    if (isset($response) && ($response)) {
       $body = (string) $response->getBody();
       $json = json_decode($body);
 
       $results = $json->opaResponse->results;
 
       $output .= "<p>There are a total of <b>".$results->total."</b> results for this query, currently processing <b>".$results->rows."</b> rows.</p>";
-
-      // initialize array of results to send to dynamo
-      $dynamo = array();
 
       foreach ($results->result as $item) {
 
@@ -109,9 +108,24 @@ class MiddleOut {
             $dynamo[] = $this->compile_json_result($parent,$title,$objectid,$objecturi);
         }
       }
-    }
+    } 
 
     $output .= var_dump($dynamo);
+
+    foreach ($dynamo as $payload) {
+      $dynamodb = $this->dynamo;
+
+      $params = [
+        'TableName' => "naraobject",
+        'Item' => $this->marshaler->marshalJson($payload)
+      ];
+      try {
+        $result = $dynamodb->putItem($params);
+      } catch (DynamoDbException $e) {
+        echo "Unable to add Nara Object: $e:\n";
+        echo $e->getMessage() . "\n";
+      }
+    }
 
     return array(
       '#type' => 'markup',
@@ -127,33 +141,20 @@ class MiddleOut {
     $request = $client->request('GET', $url);
     $data = $request->getBody();
     $filename = "public://".basename($url);
-    print $filename;
-
-    $filename = "tmp_nara_middleware_".substr(str_shuffle(md5(time())),0,12);
+    
+    // save it to public files
     $file = file_save_data($data, $filename, FILE_EXISTS_REPLACE);
 
-    $style = ImageStyle::load('nara_middleware');
-    $uri = $style->buildUri($filename);
+    // create an image style url
+    $style = \Drupal::entityTypeManager()->getStorage('image_style')->load('nara_middleware');
+    $uri = $style->buildUrl($filename);
+    
+    // now load the image style version of the url and then encode it as a base64 string
+    $type = pathinfo($uri, PATHINFO_EXTENSION);
+    $type = substr($type, 0, strpos($type, "?itok"));
+    $data = file_get_contents($uri);
+    $base64 = 'data:image/' . $type . ';base64,' . base64_encode($data);
 
-  }
-  /**
-   * Set dynamic values for a usertag record
-   */
-  public function post_usertag() {
-
-    $dynamodb = $this->dynamo;
-
-    $json = $this->get_usertag_json($this->userid, $this->objectid, $this->score);
-
-    $params = [
-      'TableName' => "UserTags",
-      'Item' => $this->marshaler->marshalJson($json)
-    ];
-    try {
-      $result = $dynamodb->putItem($params);
-    } catch (DynamoDbException $e) {
-      echo "Unable to add UserTags:\n";
-      echo $e->getMessage() . "\n";
-    }
+    return $base64;
   }
 }

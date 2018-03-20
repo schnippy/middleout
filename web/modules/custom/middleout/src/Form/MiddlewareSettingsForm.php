@@ -47,6 +47,23 @@ class MiddlewareSettingsForm extends ConfigFormBase {
       '#description' => $this->t('API search query to use to populate Dynamo middleware'),
       '#default_value' => $config->get('api_query'),
     ];
+    $form['aws_access_key'] = [
+      '#type' => 'textfield',
+      '#title' => $this->t('AWS Access Key'),
+      '#description' => $this->t('AWS Access Key ID.'),
+      '#maxlength' => 255,
+      '#size' => 255,
+      '#default_value' => $config->get('aws_access_key'),
+    ];
+    $form['aws_secret_key'] = [
+      '#type' => 'textfield',
+      '#title' => $this->t('AWS Secret Key'),
+      '#description' => $this->t('AWS Secret Key.'),
+      '#maxlength' => 255,
+      '#size' => 255,
+      '#default_value' => $config->get('aws_secret_key'),
+    ];
+
     return parent::buildForm($form, $form_state);
   }
   /**
@@ -63,6 +80,8 @@ class MiddlewareSettingsForm extends ConfigFormBase {
     $this->config('middleout.middlewaresettings')
       ->set('base_url', $form_state->getValue('base_url'))
       ->set('api_query', $form_state->getValue('api_query'))
+      ->set('aws_secret_key', $form_state->getValue('aws_secret_key'))
+      ->set('aws_access_key', $form_state->getValue('aws_access_key'))
       ->save();
   }
 }
